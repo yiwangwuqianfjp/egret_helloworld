@@ -6,6 +6,27 @@ class Main extends egret.DisplayObjectContainer {
      * 加载进度界面
     */
     private loadingView: LoadingUI;
+    //debug模式，使用图形绘制
+    private isDebug: boolean = false;
+
+    // 掉下去了
+    private isFail: boolean = false;
+    // 上次碰撞的刚体ID
+    private hitID = 0;
+    // 地面
+    private planeBody: p2.Body;
+    // 世界
+    private world: p2.World;
+    // 地面距离舞台的初始高度
+    private sh = 7;
+    // 刚体在物理世界的宽和高
+    private boxWidth = 6;
+    private boxHeight = 3;
+    // 在世界中坐标的比例
+    private factor = 50;
+
+    // 滚动背景图
+    private bgscrollView: egret.ScrollView = new egret.ScrollView();
 
     public constructor() {
         super();
@@ -53,17 +74,6 @@ class Main extends egret.DisplayObjectContainer {
             // this.loadingView.setProgress(event.itemsLoaded, event.itemsTotal);
         }
     }
-
-    //debug模式，使用图形绘制
-    private isDebug: boolean = false;
-
-    private worldBox: egret.Sprite = new egret.Sprite();
-
-    // 滚动背景图
-    private bgscrollView: egret.ScrollView = new egret.ScrollView();
-
-    // 当前物体的总高度
-    private totalHeight: number = 0;
 
     /**
      * 添加背景滚动视图
@@ -194,17 +204,6 @@ class Main extends egret.DisplayObjectContainer {
         sound.play(0, 1);
     }
 
-    // 掉下去了
-    private isFail: boolean = false;
-    // 上次碰撞的刚体ID
-    private hitID = 0;
-    // 地面
-    private planeBody: p2.Body;
-    // 世界
-    private world: p2.World;
-    // 地面距离舞台的初始高度
-    private sh = 7;
-
     /**
      * 创建游戏场景
      * Create a game scene
@@ -213,9 +212,6 @@ class Main extends egret.DisplayObjectContainer {
 
         // 添加背景
         this.addBgScrollView();
-
-        //egret.Profiler.getInstance().run();
-        var factor: number = 50;
 
         //创建world
         var world: p2.World = new p2.World();
@@ -228,74 +224,89 @@ class Main extends egret.DisplayObjectContainer {
         var baseBody = array[0];
         baseBody.position = [this.stage.stageWidth / 100, this.sh * 0.5];
         world.addBody(baseBody);
-
-        // 刚体在物理世界的宽和高
-        let boxWidth = 6;
-        let boxHeight = 3;
-
-        egret.Ticker.getInstance().register(function (dt) {
-            if (dt < 10) {
-                return;
-            }
-            if (dt > 1000) {
-                return;
-            }
-            world.step(dt / 1000);
-
-            var hitBodys = world.hitTest([4, this.sh], world.bodies, 0.01);
-            if (hitBodys.length > 0) {
-                console.log("碰撞的是--->", hitBodys);
-            }
-
-            var stageHeight: number = egret.MainContext.instance.stage.stageHeight;
-            var l = world.bodies.length;
-            for (var i: number = 0; i < l; i++) {
-                var lastBody: p2.Body = world.bodies[l - 1];
-                var lastBox: egret.DisplayObject = lastBody.displays[0];
-                if (lastBox && l != 1) {
-                    lastBox.y = Math.floor(stageHeight - lastBody.position[1] * factor);
-                    // let limitHeight = stageHeight - (l - 2) * boxHeight * factor;
-                    let limitHeight = Math.floor(stageHeight - lastBox.anchorOffsetY);
-                    if (lastBox.y > limitHeight + 20) {
-                        if (this.isFail == false) {
-                            console.log("掉下去了!!!!!!!!!!!---->", l - 1, lastBox.y);
-                            this.isFail = true;
-                            this.fail();
-                        }
-                    } else if (lastBox.y >= limitHeight - this.sh * factor - 20) {
-                        if (lastBody.id != this.hitID) {
-                            console.log("碰撞上了---->", l - 1);
-                            this.hitID = lastBody.id;
-                            this.hit();
-                        }
-                    }
-                }
-                var boxBody: p2.Body = world.bodies[i];
-                var box: egret.DisplayObject = boxBody.displays[0];
-                if (box) {
-                    box.x = boxBody.position[0] * factor;
-                    box.y = stageHeight - boxBody.position[1] * factor;
-                    box.rotation = 360 - (boxBody.angle + boxBody.shapes[0].angle) * 180 / Math.PI;
-                    // if (boxBody.sleepState == p2.Body.SLEEPING) {
-                    //     box.alpha = 0.5;
-                    // }
-                    // else {
-                    //     box.alpha = 1;
-                    // }
-                }
-            }
-        }, this);
-
-        this.addBoxByTimer(factor, boxWidth, boxHeight, world);
+        egret.Ticker.getInstance().register(this.worldChange, this);
+        this.addBoxByTimer(this.factor, this.boxWidth, this.boxHeight, world);
     }
 
     /**
-     * 判断是否叠放成功
-    */
-    private testPlaceSafe(world: p2.World) {
-
+     * 世界中物体的变化
+     */
+    private worldChange(dt: number) {
+        if (dt < 10) {
+            return;
+        }
+        if (dt > 1000) {
+            return;
+        }
+        var world = this.world;
+        var factor = this.factor;
+        world.step(dt / 1000);
+        var stageHeight: number = egret.MainContext.instance.stage.stageHeight;
+        var l = world.bodies.length;
+        this.testHit();
+        this.testFallDown();
+        for (var i: number = 0; i < l; i++) {
+            var boxBody: p2.Body = world.bodies[i];
+            var box: egret.DisplayObject = boxBody.displays[0];
+            if (box) {
+                box.x = boxBody.position[0] * factor;
+                box.y = stageHeight - boxBody.position[1] * factor;
+                box.rotation = 360 - (boxBody.angle + boxBody.shapes[0].angle) * 180 / Math.PI;
+            }
+        }
     }
 
+    /**
+     * 判断最上面的两个物体是否相撞
+     * fallBody 正在掉落的物体
+     * topBody 上一次落下的物体
+     * count 世界的物体总数量
+    */
+    private testHit() {
+        var isHit = false;
+        var count = this.world.bodies.length;
+        if (count < 2) { return }
+        var fallBody = this.world.bodies[count - 1];
+        var topBody = this.world.bodies[count - 2];
+        // 这两个物体之间在物理世界y坐标的差
+        let diff = fallBody.position[1] - topBody.position[1];
+        if (count == 2) {
+            isHit = diff <= (this.sh + this.boxHeight) / 2
+        } else {
+            isHit = diff <= this.boxHeight;
+        }
+        if (isHit && fallBody.id != this.hitID) {
+            console.log("碰撞上了---->", count - 1);
+            this.hitID = fallBody.id;
+            this.hit();
+        }
+    }
+
+    /**
+     * 判断最新加入世界的物体是否掉下来
+     * fallBody 刚进入世界的正在掉落的物体
+     * baseBody 最底下的物体(基座)
+     * count 世界的物体总数量
+     */
+    private testFallDown() {
+        // 只要fallBody的重心小于基座的重心加上其他物体的高度之和,就可以确定此物体要掉下来了
+        // 由于会有弹性形变,我们将这个值的精度设置粗一点
+        var isFallDown = false;
+        var count = this.world.bodies.length;
+        if (count < 2) { return }
+        var fallBody = this.world.bodies[count - 1];
+        var baseBody = this.world.bodies[0];
+        // 掉落物体距离基座重心之差
+        let diff = fallBody.position[1] - baseBody.position[1];
+        // 正常情况diff ==  diff < (count - 2) * this.boxHeight + this.sh / 2 + this.boxHeight / 2;
+        // 为了避免弹性形变导致的偏差,将this.boxHeight / 2去掉了
+        isFallDown = diff < (count - 2) * this.boxHeight + this.sh / 2;
+        if (isFallDown && this.isFail == false) {
+            console.log("掉下去了!!!!!!!!!!!---->", count - 1);
+            this.isFail = true;
+            this.fail();
+        }
+    }
 
     /**
      * 根据name关键字创建一个Bitmap对象。name属性请参考resources/resource.json配置文件的内容。
