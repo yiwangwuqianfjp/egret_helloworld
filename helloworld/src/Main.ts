@@ -103,7 +103,7 @@ class Main extends egret.DisplayObjectContainer {
     /**
      * 创建刚体
     */
-    private createBody(boxWidth: number, boxHeight: number, factor: number,m:number = 1): [p2.Body,egret.DisplayObject] {
+    private createBody(boxWidth: number, boxHeight: number, factor: number, m: number = 1): [p2.Body, egret.DisplayObject] {
         var display: egret.DisplayObject;
         //添加方形刚体
         var boxShape: p2.Shape = new p2.Box({ width: boxWidth, height: boxHeight });
@@ -127,7 +127,7 @@ class Main extends egret.DisplayObjectContainer {
         display.anchorOffsetY = display.height / 2;
         boxBody.displays = [display];
         this.addChild(display);
-        return [boxBody,display];
+        return [boxBody, display];
     }
 
     /**
@@ -137,7 +137,7 @@ class Main extends egret.DisplayObjectContainer {
         if (this.flowDisplay || this.isFail) {
             return;
         }
-        var array = this.createBody(boxWidth,boxHeight,factor);
+        var array = this.createBody(boxWidth, boxHeight, factor);
         var boxBody = array[0];
         var display = array[1];
         this.flowDisplay = display;
@@ -165,7 +165,7 @@ class Main extends egret.DisplayObjectContainer {
         }
     }
 
-    
+
 
     /**
      *  碰撞
@@ -224,9 +224,9 @@ class Main extends egret.DisplayObjectContainer {
         this.world = world;
 
         //创建一个地基
-        var array = this.createBody(8,this.sh,50,0);
+        var array = this.createBody(8, this.sh, 50, 0);
         var baseBody = array[0];
-        baseBody.position = [this.stage.stageWidth / 100,this.sh * 0.5];
+        baseBody.position = [this.stage.stageWidth / 100, this.sh * 0.5];
         world.addBody(baseBody);
 
         // 刚体在物理世界的宽和高
@@ -242,6 +242,11 @@ class Main extends egret.DisplayObjectContainer {
             }
             world.step(dt / 1000);
 
+            var hitBodys = world.hitTest([4, this.sh], world.bodies, 0.01);
+            if (hitBodys.length > 0) {
+                console.log("碰撞的是--->", hitBodys);
+            }
+
             var stageHeight: number = egret.MainContext.instance.stage.stageHeight;
             var l = world.bodies.length;
             for (var i: number = 0; i < l; i++) {
@@ -252,14 +257,14 @@ class Main extends egret.DisplayObjectContainer {
                     // let limitHeight = stageHeight - (l - 2) * boxHeight * factor;
                     let limitHeight = Math.floor(stageHeight - lastBox.anchorOffsetY);
                     if (lastBox.y > limitHeight + 20) {
-                        console.log("掉下去了!!!!!!!!!!!---->", l - 1, lastBox.y);
                         if (this.isFail == false) {
+                            console.log("掉下去了!!!!!!!!!!!---->", l - 1, lastBox.y);
                             this.isFail = true;
                             this.fail();
                         }
                     } else if (lastBox.y >= limitHeight - this.sh * factor - 20) {
-                        console.log("碰撞上了---->", l - 1);
                         if (lastBody.id != this.hitID) {
+                            console.log("碰撞上了---->", l - 1);
                             this.hitID = lastBody.id;
                             this.hit();
                         }
@@ -271,12 +276,12 @@ class Main extends egret.DisplayObjectContainer {
                     box.x = boxBody.position[0] * factor;
                     box.y = stageHeight - boxBody.position[1] * factor;
                     box.rotation = 360 - (boxBody.angle + boxBody.shapes[0].angle) * 180 / Math.PI;
-                    if (boxBody.sleepState == p2.Body.SLEEPING) {
-                        box.alpha = 0.5;
-                    }
-                    else {
-                        box.alpha = 1;
-                    }
+                    // if (boxBody.sleepState == p2.Body.SLEEPING) {
+                    //     box.alpha = 0.5;
+                    // }
+                    // else {
+                    //     box.alpha = 1;
+                    // }
                 }
             }
         }, this);
@@ -288,7 +293,7 @@ class Main extends egret.DisplayObjectContainer {
      * 判断是否叠放成功
     */
     private testPlaceSafe(world: p2.World) {
-       
+
     }
 
 

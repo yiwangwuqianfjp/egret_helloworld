@@ -203,6 +203,10 @@ var Main = (function (_super) {
                 return;
             }
             world.step(dt / 1000);
+            var hitBodys = world.hitTest([4, this.sh], world.bodies, 0.01);
+            if (hitBodys.length > 0) {
+                console.log("碰撞的是--->", hitBodys);
+            }
             var stageHeight = egret.MainContext.instance.stage.stageHeight;
             var l = world.bodies.length;
             for (var i = 0; i < l; i++) {
@@ -213,15 +217,15 @@ var Main = (function (_super) {
                     // let limitHeight = stageHeight - (l - 2) * boxHeight * factor;
                     var limitHeight = Math.floor(stageHeight - lastBox.anchorOffsetY);
                     if (lastBox.y > limitHeight + 20) {
-                        console.log("掉下去了!!!!!!!!!!!---->", l - 1, lastBox.y);
                         if (this.isFail == false) {
+                            console.log("掉下去了!!!!!!!!!!!---->", l - 1, lastBox.y);
                             this.isFail = true;
                             this.fail();
                         }
                     }
                     else if (lastBox.y >= limitHeight - this.sh * factor - 20) {
-                        console.log("碰撞上了---->", l - 1);
                         if (lastBody.id != this.hitID) {
+                            console.log("碰撞上了---->", l - 1);
                             this.hitID = lastBody.id;
                             this.hit();
                         }
@@ -233,12 +237,12 @@ var Main = (function (_super) {
                     box.x = boxBody.position[0] * factor;
                     box.y = stageHeight - boxBody.position[1] * factor;
                     box.rotation = 360 - (boxBody.angle + boxBody.shapes[0].angle) * 180 / Math.PI;
-                    if (boxBody.sleepState == p2.Body.SLEEPING) {
-                        box.alpha = 0.5;
-                    }
-                    else {
-                        box.alpha = 1;
-                    }
+                    // if (boxBody.sleepState == p2.Body.SLEEPING) {
+                    //     box.alpha = 0.5;
+                    // }
+                    // else {
+                    //     box.alpha = 1;
+                    // }
                 }
             }
         }, this);
