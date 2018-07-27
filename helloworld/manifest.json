@@ -9,7 +9,9 @@
 		"libs/modules/promise/promise.js"
 	],
 	"game": [
+		"bin-debug/Coin.js",
 		"bin-debug/LoadingUI.js",
+		"bin-debug/MachineHand.js",
 		"bin-debug/Main.js",
 		"bin-debug/Platform.js"
 	]

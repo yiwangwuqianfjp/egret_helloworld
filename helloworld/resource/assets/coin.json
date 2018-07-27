@@ -1,0 +1,9 @@
+{"file":"coin.png","frames":{
+"coin_7":{"x":49,"y":33,"w":8,"h":31,"offX":12,"offY":1,"sourceW":32,"sourceH":32},
+"coin_6":{"x":34,"y":33,"w":13,"h":31,"offX":10,"offY":1,"sourceW":32,"sourceH":32},
+"coin_5":{"x":34,"y":0,"w":17,"h":31,"offX":8,"offY":1,"sourceW":32,"sourceH":32},
+"coin_4":{"x":30,"y":91,"w":21,"h":31,"offX":6,"offY":1,"sourceW":32,"sourceH":32},
+"coin_3":{"x":0,"y":91,"w":28,"h":31,"offX":2,"offY":1,"sourceW":32,"sourceH":32},
+"coin_2":{"x":0,"y":0,"w":31,"h":29,"offX":0,"offY":2,"sourceW":32,"sourceH":32},
+"coin_1":{"x":0,"y":31,"w":32,"h":28,"offX":0,"offY":3,"sourceW":32,"sourceH":32},
+"coin_0":{"x":0,"y":61,"w":32,"h":28,"offX":0,"offY":3,"sourceW":32,"sourceH":32}}}

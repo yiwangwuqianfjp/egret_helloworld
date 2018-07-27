@@ -1,32 +1,41 @@
 
 class Main extends egret.DisplayObjectContainer {
-
-
+    
     /**
      * 加载进度界面
     */
     private loadingView: LoadingUI;
+
     //debug模式，使用图形绘制
     private isDebug: boolean = false;
 
     // 掉下去了
     private isFail: boolean = false;
+
     // 上次碰撞的刚体ID
     private hitID = 0;
-    // 地面
-    private planeBody: p2.Body;
+
     // 世界
     private world: p2.World;
-    // 地面距离舞台的初始高度
-    private sh = 7;
+    // 地基的宽度和高度
+    private baseW = 8;
+    private baseH = 4;
+
     // 刚体在物理世界的宽和高
-    private boxWidth = 6;
-    private boxHeight = 3;
+    private boxWidth = 4;
+    private boxHeight = 2;
+
     // 在世界中坐标的比例
     private factor = 50;
 
     // 滚动背景图
-    private bgscrollView: egret.ScrollView = new egret.ScrollView();
+    private bgView: egret.DisplayObjectContainer;
+
+    // 世界内的物体容器
+    private worldContainer: egret.DisplayObjectContainer;
+
+    // 机械手
+    private machinehand: MachineHand;
 
     public constructor() {
         super();
@@ -67,8 +76,8 @@ class Main extends egret.DisplayObjectContainer {
     }
 
     /**
- * preload资源组加载进度
- */
+     * preload资源组加载进度
+    */
     private onResourceProgress(event: RES.ResourceEvent): void {
         if (event.groupName == "preload") {
             // this.loadingView.setProgress(event.itemsLoaded, event.itemsTotal);
@@ -76,45 +85,129 @@ class Main extends egret.DisplayObjectContainer {
     }
 
     /**
-     * 添加背景滚动视图
-    */
+      * 创建游戏场景
+      * Create a game scene
+      */
+    private createGameScene() {
 
-    private addBgScrollView() {
-        var content: egret.Bitmap = this.createBitmapByName("bg_jpg");
-
-        //创建ScrollView
-        let myscrollView = this.bgscrollView;
-        myscrollView.setContent(content);
-        myscrollView.width = this.stage.stageWidth;
-        myscrollView.height = this.stage.stageHeight;
-        myscrollView.x = 0;
-        myscrollView.y = 0;
-        this.addChild(myscrollView);
-
-        content.width = myscrollView.width;
-        content.height = myscrollView.height * 2;
-        myscrollView.scrollTop = this.stage.stageHeight;
-        myscrollView.verticalScrollPolicy = "off";
+        this.setWorld();
+        this.setWorldContainer();
+        this.setBgView();
+        this.setMachineHand();
+        this.setBaseBody();
+        this.exchangeMessageWithNative();
     }
 
-    // 漂浮的物体
-    // private flowBody:p2.Body;
-    private flowDisplay: egret.DisplayObject;
+    /**
+     * 创建world
+     */
+    private setWorld(){
+        var world: p2.World = new p2.World();
+        world.sleepMode = p2.World.BODY_SLEEPING;
+        world.defaultContactMaterial.restitution = 0;
+        this.world = world;
+    }
 
-    // 漂浮动画
-    private flowAnimation(display: egret.DisplayObject) {
-        var rect = display;
-        rect.y = 100;
-        this.addChild(rect);
-        let duration = 3000;
-        egret.Tween.get(rect, { loop: true }).to({ x: this.stage.stageWidth + 100 }, duration).to({ x: -100 }, duration);
+    /**
+     * 设置世界里物体的容器
+     */
+    private setWorldContainer(){
+        var worldContainer = new egret.DisplayObjectContainer();
+        this.worldContainer = worldContainer;
+        this.addChild(worldContainer);
+        worldContainer.x = 0;
+        worldContainer.y = 0;
+        worldContainer.width = this.stage.stageWidth;
+        worldContainer.height = this.stage.stageHeight;
+    }
+
+    /**
+     * 设置背景
+     */
+    private setBgView(){
+        // 天空背景
+        var bottomImage: egret.Bitmap = this.createBitmapByName("house1_sky_0_png");
+        var topImage: egret.Bitmap = this.createBitmapByName("house1_sky_1_png");
+        var content: egret.DisplayObjectContainer = new egret.DisplayObjectContainer()
+        bottomImage.y = topImage.measuredHeight;
+        content.addChild(topImage);
+        content.addChild(bottomImage);
+        content.y = -topImage.measuredHeight;
+        this.bgView = content;
+        this.worldContainer.addChild(content);
+
+        // 楼房背景
+        var buildingImage: egret.Bitmap = this.createBitmapByName("house1_floor_png");// 640 535
+        var buildingBgView = new egret.DisplayObjectContainer();
+        buildingBgView.y = this.stage.stageHeight - 535;
+        buildingBgView.x = 0;
+        buildingBgView.addChild(buildingImage);
+        this.worldContainer.addChild(buildingBgView);
+    }
+
+    /**
+     * 添加机械手
+    */
+
+    private setMachineHand() {
+
+        // 机械手
+        var hand = new MachineHand();
+        hand.x = (this.stage.stageWidth - hand.width) / 2;
+        hand.y = - hand.height;
+        this.machinehand = hand;
+        this.addChild(hand);
+        egret.Tween.get(hand).to({ y: - 100 }, 500, egret.Ease.backOut);
+        this.stage.addEventListener(egret.TouchEvent.TOUCH_TAP, this.letHouseGo, this);
+    }
+
+    /**
+     * 设置地基上的房子
+     */
+    private setBaseBody(){
+        var baseBody = this.createBody(this.baseW, this.baseH, 0);
+        var display = this.createDisplay("house1_0_png");
+        baseBody.displays = [display];
+        this.worldContainer.addChild(display);
+        baseBody.position = [this.stage.stageWidth / 100, this.baseH * 0.5 + 128 / this.factor];
+        this.world.addBody(baseBody);
+        egret.Ticker.getInstance().register(this.worldChange, this);
+    }
+
+    /**
+     * 与native通信
+     */
+    private exchangeMessageWithNative(){
+        // 开始游戏 发消息给native
+        egret.ExternalInterface.call("sendToNative", "游戏开始");
+        // 接收native的消息
+        egret.ExternalInterface.addCallback("sendToJS", function (message: string) {
+            alert("收到native消息:" + message);
+        });
+    }
+
+    /**
+     * 放开房子
+     */
+    private letHouseGo() {
+        if (this.machinehand.houseIsDisplay() == false) {
+            return;
+        }
+        var boxBody = this.createBody(this.boxWidth, this.boxHeight);
+        var display = this.machinehand.relaxHouse();
+        boxBody.displays = [display];
+        this.worldContainer.addChild(display);
+        var positionX: number = display.x / this.factor;
+        var positionY: number = (this.worldContainer.y + this.worldContainer.height - display.y + display.anchorOffsetY - 50) / this.factor;
+        boxBody.position = [positionX, positionY];
+        // 添加到世界
+        this.world.addBody(boxBody);
     }
 
     /**
      * 创建刚体
-    */
-    private createBody(boxWidth: number, boxHeight: number, factor: number, m: number = 1): [p2.Body, egret.DisplayObject] {
-        var display: egret.DisplayObject;
+     */
+    private createBody(boxWidth: number, boxHeight: number, m: number = 1): p2.Body {
         //添加方形刚体
         var boxShape: p2.Shape = new p2.Box({ width: boxWidth, height: boxHeight });
         var boxBody: p2.Body = new p2.Body({
@@ -124,108 +217,56 @@ class Main extends egret.DisplayObjectContainer {
             damping: 0.7
         });
         boxBody.addShape(boxShape);
-
-        if (this.isDebug) {
-            display = this.createBox((<p2.Box>boxShape).width * factor, (<p2.Box>boxShape).height * factor);
-        } else {
-            display = this.createBitmapByName("rect_png");
-        }
-        display.width = (<p2.Box>boxShape).width * factor;
-        display.height = (<p2.Box>boxShape).height * factor;
-
-        display.anchorOffsetX = display.width / 2;
-        display.anchorOffsetY = display.height / 2;
-        boxBody.displays = [display];
-        this.addChild(display);
-        return [boxBody, display];
+        return boxBody;
     }
 
     /**
-    * 定时添加刚体
-   */
-    private addBoxByTimer(factor: number, boxWidth: number, boxHeight: number, world: p2.World) {
-        if (this.flowDisplay || this.isFail) {
-            return;
-        }
-        var array = this.createBody(boxWidth, boxHeight, factor);
-        var boxBody = array[0];
-        var display = array[1];
-        this.flowDisplay = display;
-        this.flowAnimation(display);
-
-        this.stage.addEventListener(egret.TouchEvent.TOUCH_TAP, addOneBox, this);
-        let self = this;
-
-        function addOneBox(e: egret.TouchEvent): void {
-            if (boxBody.displays[0] == self.flowDisplay) {
-                self.flowDisplay = null;
-                var positionX: number = display.x / factor;
-                var positionY: number = Math.floor((egret.MainContext.instance.stage.stageHeight - display.y) / factor);
-                boxBody.position = [positionX, positionY];
-                // 添加到世界
-                world.addBody(boxBody);
-                // 停止动画
-                egret.Tween.pauseTweens(display);
-
-                // 延迟三秒后添加新的刚体
-                egret.setTimeout(function () {
-                    self.addBoxByTimer(factor, boxWidth, boxHeight, world)
-                }, 1, 3000);
-            }
-        }
+     * 创建刚体的display
+     */
+    private createDisplay(imgName: string): egret.DisplayObject {
+        var display: egret.DisplayObject;
+        display = this.createBitmapByName(imgName);
+        display.anchorOffsetX = display.width / 2;
+        display.anchorOffsetY = display.height / 2;
+        return display;
     }
-
-
 
     /**
      *  碰撞
     */
     private hit() {
-
-        var sound: egret.Sound = RES.getRes("hit_mp3");
-        sound.play(0, 1);
+        this.playSoundWithName("hit_mp3");
         var self = this;
         var count = this.world.bodies.length;
         egret.setTimeout(function () {
-            let boxHieght = 3;
-            for (var i = 0; i < count; i++) {
-                var body = self.world.bodies[i];
-                var positionY = body.position[1];
-                positionY -= boxHieght;
-                body.position = [body.position[0], positionY]
+            let boxHieght = self.boxHeight;
+            if (self.isFail == false) {
+                self.machinehand.run();
             }
-            self.bgscrollView.scrollTop -= boxHieght * 50;
-        }, 0, 2000);
-
-    }
-
-    private fail() {
-        var sound: egret.Sound = RES.getRes("break_mp3");
-        sound.play(0, 1);
+            egret.Tween.get(self.bgView).to({ y: self.bgView.y - self.factor }, 300);
+            egret.Tween.get(self.worldContainer).to({ y: self.worldContainer.y + boxHieght * self.factor }, 300);
+        }, 0, 1000);
+        this.worldContainerShack();
     }
 
     /**
-     * 创建游戏场景
-     * Create a game scene
+     * 震动
      */
-    private createGameScene() {
+    private worldContainerShack() {
+        var oriY = this.worldContainer.y;
+        var amplitude = 5;
+        egret.Tween.get(this.worldContainer).to({ y: oriY + amplitude }, 100, egret.Ease.elasticInOut).to({ y: oriY }, 100, egret.Ease.elasticInOut);
+    }
 
-        // 添加背景
-        this.addBgScrollView();
-
-        //创建world
-        var world: p2.World = new p2.World();
-        world.sleepMode = p2.World.BODY_SLEEPING;
-        world.defaultContactMaterial.restitution = 0;
-        this.world = world;
-
-        //创建一个地基
-        var array = this.createBody(8, this.sh, 50, 0);
-        var baseBody = array[0];
-        baseBody.position = [this.stage.stageWidth / 100, this.sh * 0.5];
-        world.addBody(baseBody);
-        egret.Ticker.getInstance().register(this.worldChange, this);
-        this.addBoxByTimer(this.factor, this.boxWidth, this.boxHeight, world);
+    /**
+     * 掉下去了
+     */
+    private fail() {
+        this.playSoundWithName("break_mp3");
+        this.machinehand.stop();
+        this.stage.removeEventListener(egret.TouchEvent.TOUCH_TAP, this.letHouseGo, this);
+        // 发消息给native
+        egret.ExternalInterface.call("getResultSuccess", "游戏结束");
     }
 
     /**
@@ -271,7 +312,7 @@ class Main extends egret.DisplayObjectContainer {
         // 这两个物体之间在物理世界y坐标的差
         let diff = fallBody.position[1] - topBody.position[1];
         if (count == 2) {
-            isHit = diff <= (this.sh + this.boxHeight) / 2
+            isHit = diff <= (this.baseH + this.boxHeight) / 2
         } else {
             isHit = diff <= this.boxHeight;
         }
@@ -300,7 +341,7 @@ class Main extends egret.DisplayObjectContainer {
         let diff = fallBody.position[1] - baseBody.position[1];
         // 正常情况diff ==  diff < (count - 2) * this.boxHeight + this.sh / 2 + this.boxHeight / 2;
         // 为了避免弹性形变导致的偏差,将this.boxHeight / 2去掉了
-        isFallDown = diff < (count - 2) * this.boxHeight + this.sh / 2;
+        isFallDown = diff < (count - 2) * this.boxHeight + this.baseH / 2;
         if (isFallDown && this.isFail == false) {
             console.log("掉下去了!!!!!!!!!!!---->", count - 1);
             this.isFail = true;
@@ -330,4 +371,11 @@ class Main extends egret.DisplayObjectContainer {
         return shape;
     }
 
+    /**
+     * 播放音乐
+     */
+    private playSoundWithName(name:string){
+        var sound: egret.Sound = RES.getRes(name);
+        sound.play(0, 1);
+    }
 }
